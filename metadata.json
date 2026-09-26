@@ -1,0 +1,6 @@
+{
+  "name": "Chat 120",
+  "description": "Chat 120 - Encrypted 120-minute ephemeral messaging, real-time voice calls, large code sharing, and 100MB file transfers.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
