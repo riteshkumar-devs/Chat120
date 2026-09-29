@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat 120 — Privacy-First Ephemeral Messaging</title>
+  <meta name="description" content="Chat 120 - 120-minute auto-destructing encrypted messaging with AES-256-GCM client encryption, WebRTC voice calling, 100MB file uploads, and 10k+ line code sharing." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300a884'><path d='M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z'/></svg>" />
+</head>
+<body>
+  <!-- Ambient background glow -->
+  <div class="ambient-glow-top"></div>
+  <div class="ambient-glow-bottom"></div>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-icon">💬</div>
+        <div class="brand-info">
+          <h1>Chat 120</h1>
+          <p>120-Minute Ephemeral Messaging</p>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button type="button" class="btn-secondary open-repo-modal">
+          <span>⭐ Star on GitHub</span>
+          <span style="font-size: 11px; opacity: 0.7; margin-left: 4px;">1.4k</span>
+        </button>
+        <button type="button" class="btn-primary try-live-btn">
+          <span>Launch Chat 120</span>
+          <span>→</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Showcase Container -->
+  <main class="main-wrapper">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="badge">
+        <span class="pulse-dot"></span>
+        <span>Extreme Ephemeral Privacy • Zero Identity Tracking</span>
+      </div>
+
+      <h1 class="hero-title">
+        Conversations that evaporate in <br />
+        <span class="gradient-text">120 Minutes</span>
+      </h1>
+
+      <p class="hero-desc">
+        A WhatsApp-grade real-time chat suite engineered for total privacy. Featuring client-side 
+        <strong>AES-256-GCM encryption</strong>, <strong>100MB file uploads</strong>, encrypted WebRTC voice calls, 
+        and developer code snippets up to 10,000 lines.
+      </p>
+
+      <div class="hero-cta">
+        <button type="button" class="btn-primary try-live-btn" style="padding: 14px 28px; font-size: 15px;">
+          <span>⚡ Click Here to Try Chat 120</span>
+          <span>→</span>
+        </button>
+
+        <button type="button" class="btn-secondary open-repo-modal" style="padding: 14px 24px; font-size: 15px;">
+          <span>📂 Explore GitHub Repo</span>
+        </button>
+      </div>
+
+      <div class="hero-highlights">
+        <div class="highlight-item">
+          <span class="icon">✓</span>
+          <span>No Email or Phone Required</span>
+        </div>
+        <div class="highlight-item">
+          <span class="icon">✓</span>
+          <span>100MB File &amp; Media Transfers</span>
+        </div>
+        <div class="highlight-item">
+          <span class="icon">✓</span>
+          <span>AES-256-GCM End-to-End Encrypted</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Mockup Section -->
+    <section class="mockup-container">
+      <div class="mockup-header">
+        <div class="window-dots">
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+        <div class="mockup-badge">
+          <span>🔒 AES-256-GCM Client Encrypted</span>
+        </div>
+      </div>
+
+      <div class="mockup-body">
+        <div class="date-divider">
+          TODAY • SESSION AUTO-DESTUCT IN <span id="liveMockupCountdown">119m 45s</span>
+        </div>
+
+        <div class="msg-row received">
+          <div class="avatar">🦊</div>
+          <div class="msg-bubble">
+            <span class="msg-author">Alex • Guest ID #4892</span>
+            <p>Hey! I just attached the 85MB dataset and 10,000-line server script. All encrypted client-side with AES-256.</p>
+            <div class="file-attachment-card">
+              <div class="file-info">
+                <span style="font-size: 18px;">📄</span>
+                <div>
+                  <div class="file-name">production_logs_dataset.tar.gz</div>
+                  <div class="file-sub">85.4 MB • 100MB Max Cloud Upload</div>
+                </div>
+              </div>
+              <span class="badge" style="font-size: 10px;">Ready</span>
+            </div>
+            <span class="msg-meta">10:42 AM ✓✓</span>
+          </div>
+        </div>
+
+        <div class="msg-row sent">
+          <div class="avatar">🦁</div>
+          <div class="msg-bubble">
+            <p>Got it! Code snippet rendered cleanly with syntax highlighting. Session will auto-wipe in 118 mins.</p>
+            <span class="msg-meta">10:43 AM ✓✓</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Grid Section -->
+    <section>
+      <div class="features-header">
+        <h2>Built with Complete Privacy Architecture</h2>
+        <p>No telemetry, no account passwords, zero permanent logs.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon-box">⏱️</div>
+          <h3>120-Minute Ephemeral Lifecycle</h3>
+          <p>
+            By default, all user documents, guest IDs, message logs, and files auto-destruct after 120 minutes. 
+            Optionally configure custom lifetimes or execute a 1-click permanent wipe.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">🛡️</div>
+          <h3>Client-Side AES-256-GCM</h3>
+          <p>
+            Messages and code snippets are encrypted directly in browser memory using the Web Crypto API with 256-bit keys 
+            and unique 12-byte IVs before transmission to the database.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">☁️</div>
+          <h3>100MB File Transfers</h3>
+          <p>
+            Share high-resolution videos, full raw log archives, database dumps, and zip files up to 100MB with 
+            real-time progress status feedback.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">💻</div>
+          <h3>10,000+ Line Code Viewer</h3>
+          <p>
+            Built for developers. Share multi-thousand line snippets with VS Code dark syntax formatting, 
+            line numbers, custom language tagging, and fullscreen inspection.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">📞</div>
+          <h3>Encrypted WebRTC Voice</h3>
+          <p>
+            Peer-to-peer crystal clear audio calling secured by DTLS-SRTP encryption, active call duration timers, 
+            mute controls, and participant indicators.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-box">📱</div>
+          <h3>QR Code Peer Discovery</h3>
+          <p>
+            Instant direct connection by scanning a peer's personal QR code or sharing a 6-digit room code without 
+            revealing any email addresses or phone numbers.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- GitHub Repository Section -->
+    <section class="repo-section">
+      <div class="repo-header">
+        <div class="repo-title-box">
+          <span class="badge" style="margin-bottom: 8px;">OPEN SOURCE REPOSITORY</span>
+          <h3>chat-120 / chat-120-web</h3>
+          <p>Modern TypeScript, React 18, Tailwind CSS, Web Crypto AES-256-GCM, and Firebase.</p>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn-secondary" id="shareAppBtn">
+            <span>🔗 Share App</span>
+          </button>
+          <button type="button" class="btn-primary open-repo-modal">
+            <span>⭐ Star on GitHub</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="terminal-box">
+        <div class="terminal-text">
+          <span class="terminal-prompt">$</span>
+          <span class="terminal-cmd" id="cloneCommandText">git clone https://github.com/chat120/chat-120.git</span>
+        </div>
+        <button type="button" class="copy-btn" id="copyCloneBtn">
+          <span>📋 Copy</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Bottom Launch Banner -->
+    <section class="launch-banner">
+      <h2>Ready to experience Chat 120?</h2>
+      <p>No registration, no emails, zero setup friction. Enter a name and start chatting with 120-minute privacy.</p>
+      <button type="button" class="btn-launch try-live-btn">
+        <span>Launch Chat 120 App Now →</span>
+      </button>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div>
+        <strong style="color: #fff;">Chat 120</strong> — Privacy-First Ephemeral Communications
+      </div>
+      <div style="display: flex; gap: 16px;">
+        <button type="button" class="open-repo-modal" style="color: var(--text-muted);">GitHub</button>
+        <span>•</span>
+        <button type="button" class="try-live-btn" style="color: var(--accent); font-weight: 600;">Launch Chat App</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- GitHub Modal -->
+  <div class="modal-overlay" id="repoModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">⭐</span>
+          <div>
+            <h3 style="color: #fff; font-size: 16px;">Chat 120 GitHub Repository</h3>
+            <p style="font-size: 11px; color: var(--text-muted);">github.com/chat120/chat-120</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close" id="closeModalBtn">&times;</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+        Chat 120 is an open-source privacy communication platform with Web Crypto AES-256 client encryption, 
+        automatic 120-minute session expiration, 100MB file uploads, and WebRTC audio calling.
+      </p>
+
+      <div style="background: var(--bg-primary); padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #00a884;">
+        <p style="color: #8696a0; margin-bottom: 4px;"># Clone &amp; run locally:</p>
+        <p style="color: #fff;">git clone https://github.com/chat120/chat-120.git</p>
+        <p style="color: #fff;">cd chat-120 &amp;&amp; npm install &amp;&amp; npm run dev</p>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); padding-top: 4px;">
+        <span>License: MIT</span>
+        <span>TypeScript 100%</span>
+        <span>Stars: 1,420+</span>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-top: 8px;">
+        <button type="button" class="btn-secondary" style="flex: 1; justify-content: center;" onclick="navigator.clipboard.writeText('git clone https://github.com/chat120/chat-120.git'); alert('Clone URL copied!');">
+          <span>Copy URL</span>
+        </button>
+        <button type="button" class="btn-primary try-live-btn" style="flex: 1; justify-content: center;">
+          <span>Try Live App</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

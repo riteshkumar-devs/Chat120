@@ -78,9 +78,7 @@ import {
   Clock,
   Sparkles,
   AlertTriangle,
-  RotateCcw,
-  Globe,
-  ExternalLink
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -102,7 +100,6 @@ import {
   AnimalAvatar 
 } from './lib/avatars';
 import { e2ee } from './lib/crypto';
-import { ShowcaseLandingPage } from './components/ShowcaseLandingPage';
 
 export { getAvatarUrl, ANIMAL_AVATARS, getAnimalById, generateShortUserId };
 
@@ -327,7 +324,7 @@ const formatDatePill = (timestamp: any): string => {
 
 // --- Components ---
 
-const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewShowcase?: () => void }> = ({ onJoin, onViewShowcase }) => {
+const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void }> = ({ onJoin }) => {
   const [name, setName] = useState('');
   const [selectedAnimal, setSelectedAnimal] = useState('fox');
   const [autoDeleteOption, setAutoDeleteOption] = useState<string>('2h');
@@ -407,30 +404,30 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] w-full bg-[#0b141a] flex flex-col items-center justify-center p-3 sm:p-6 overflow-y-auto relative custom-scrollbar">
+    <div className="h-full h-[100dvh] w-full bg-[#0b141a] overflow-hidden flex items-center justify-center p-3 sm:p-4 relative selection:bg-[#00a884] selection:text-white">
       {/* Background Ambient Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-[#00a884]/15 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-[#00a884]/10 blur-[120px] rounded-full pointer-events-none"></div>
 
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.22 }}
-        className="bg-[#202c33] p-5 sm:p-7 rounded-3xl shadow-2xl w-full max-w-lg border border-[#3b4a54]/80 relative z-10 flex flex-col gap-4 my-auto"
+        transition={{ duration: 0.2 }}
+        className="bg-[#202c33] p-4 sm:p-5 rounded-3xl shadow-2xl w-full max-w-md border border-[#3b4a54]/80 relative z-10 flex flex-col gap-2.5 max-h-[96dvh] overflow-y-auto no-scrollbar my-auto"
       >
         {/* CENTERED PROJECT NAME & BRANDING */}
-        <div className="text-center flex flex-col items-center pb-2.5 border-b border-[#3b4a54]/40">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00a884] via-[#05cd99] to-[#25d366] flex items-center justify-center text-white shadow-xl shadow-[#00a884]/30 mb-2.5">
-            <MessageCircle className="w-8 h-8 fill-current" />
+        <div className="text-center flex flex-col items-center pb-2 border-b border-[#3b4a54]/40 shrink-0">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#00a884] via-[#05cd99] to-[#25d366] flex items-center justify-center text-white shadow-lg shadow-[#00a884]/25 mb-1">
+            <MessageCircle className="w-6 h-6 fill-current" />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-none">
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-none">
             Chat 120
           </h1>
-          <p className="text-xs sm:text-sm text-[#8696a0] mt-1.5 font-medium">
+          <p className="text-xs text-[#8696a0] mt-0.5 font-medium">
             120-Minute Ephemeral Encrypted Messaging
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#111b21] border border-[#00a884]/30 text-[11px] text-[#00a884] font-semibold">
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#111b21] border border-[#00a884]/30 text-[10px] text-[#00a884] font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#00a884] animate-pulse"></span>
               <span>AES-256-GCM E2EE • DTLS Voice</span>
             </span>
@@ -441,27 +438,27 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
           <motion.div 
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/15 border border-red-500/30 text-red-400 px-3.5 py-2 rounded-xl text-xs text-center font-medium"
+            className="bg-red-500/15 border border-red-500/30 text-red-400 px-3 py-1.5 rounded-xl text-xs text-center font-medium shrink-0"
           >
             {error}
           </motion.div>
         )}
 
         {/* Selected Avatar Preview + Name Input */}
-        <div className="flex items-center gap-3.5 bg-[#111b21] p-3.5 rounded-2xl border border-[#3b4a54]/70">
+        <div className="flex items-center gap-3 bg-[#111b21] p-2.5 rounded-2xl border border-[#3b4a54]/70 shrink-0">
           <div className="relative shrink-0">
             <img 
               src={currentAvatarSvgUri} 
               alt="Avatar preview" 
-              className="w-14 h-14 rounded-full border-2 border-[#00a884] shadow-lg object-cover transition-all"
+              className="w-11 h-11 rounded-full border-2 border-[#00a884] shadow-md object-cover transition-all"
             />
-            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full border border-[#202c33] flex items-center justify-center text-[9px] text-white font-bold">
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border border-[#202c33] flex items-center justify-center text-[8px] text-white font-bold">
               ✓
             </span>
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-center mb-1">
-              <label className="text-[11px] font-bold text-[#00a884] uppercase tracking-wider">
+              <label className="text-[10px] font-bold text-[#00a884] uppercase tracking-wider">
                 Your Display Name
               </label>
               <span className="text-[10px] text-[#8696a0] capitalize font-semibold bg-[#202c33] px-2 py-0.5 rounded-md">
@@ -471,7 +468,7 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
             <input 
               type="text" 
               placeholder="What should we call you? (e.g. Alex)" 
-              className="w-full bg-[#202c33] border border-[#3b4a54] outline-none text-[#e9edef] rounded-xl px-3.5 py-2 text-sm focus:border-[#00a884] transition-all placeholder:text-[#8696a0]"
+              className="w-full bg-[#202c33] border border-[#3b4a54] outline-none text-[#e9edef] rounded-xl px-3 py-1.5 text-sm focus:border-[#00a884] transition-all placeholder:text-[#8696a0]"
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={30}
@@ -482,14 +479,14 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
         </div>
 
         {/* Choose Animal Avatar Carousel */}
-        <div className="space-y-1.5">
+        <div className="space-y-1 shrink-0">
           <div className="flex justify-between items-center px-0.5">
-            <span className="text-[11px] font-bold text-[#8696a0] uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-[#8696a0] uppercase tracking-wider">
               Choose Animal Avatar ({ANIMAL_AVATARS.length})
             </span>
             <span className="text-[10px] text-emerald-400 font-medium">Tap to switch</span>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto py-1.5 px-1 bg-[#111b21] rounded-2xl border border-[#3b4a54]/60 no-scrollbar">
+          <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 bg-[#111b21] rounded-2xl border border-[#3b4a54]/60 no-scrollbar">
             {ANIMAL_AVATARS.map((animal) => {
               const isSelected = selectedAnimal === animal.id;
               return (
@@ -498,7 +495,7 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
                   type="button"
                   onClick={() => setSelectedAnimal(animal.id)}
                   className={cn(
-                    "flex flex-col items-center justify-center p-1.5 rounded-xl transition-all shrink-0 w-14",
+                    "flex flex-col items-center justify-center p-1 rounded-xl transition-all shrink-0 w-12",
                     isSelected 
                       ? "bg-[#00a884]/25 ring-2 ring-[#00a884] shadow-md scale-105" 
                       : "hover:bg-[#202c33] opacity-75 hover:opacity-100"
@@ -508,9 +505,9 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
                   <img 
                     src={createAnimalSvgDataUri(animal)} 
                     alt={animal.name} 
-                    className="w-8 h-8 rounded-full object-cover shadow"
+                    className="w-7 h-7 rounded-full object-cover shadow"
                   />
-                  <span className="text-[9px] text-[#e9edef] mt-1 font-medium truncate max-w-full">
+                  <span className="text-[9px] text-[#e9edef] mt-0.5 font-medium truncate max-w-full">
                     {animal.name}
                   </span>
                 </button>
@@ -520,11 +517,11 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
         </div>
 
         {/* 120-Minute Auto-Delete Duration Options */}
-        <div className="bg-[#111b21] p-3 rounded-2xl border border-[#3b4a54]/60 space-y-2">
+        <div className="bg-[#111b21] p-2 rounded-2xl border border-[#3b4a54]/60 space-y-1 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-xs font-bold text-[#e9edef]">Session Lifetime</span>
+              <span className="text-[11px] font-bold text-[#e9edef]">Session Lifetime</span>
             </div>
             <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
               {autoDeleteOption === 'never' ? 'Manual Delete Only' : autoDeleteOption === '2h' ? '120 Mins (Default)' : 'Auto-Destruct'}
@@ -542,7 +539,7 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
                 type="button"
                 onClick={() => setAutoDeleteOption(opt.id)}
                 className={cn(
-                  "py-2 px-1 text-xs font-semibold rounded-xl transition text-center",
+                  "py-1 px-1 text-[11px] font-semibold rounded-xl transition text-center",
                   autoDeleteOption === opt.id 
                     ? "bg-[#00a884] text-white shadow-md font-bold" 
                     : "bg-[#202c33] text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
@@ -555,7 +552,7 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
         </div>
 
         {/* Ephemeral Guest ID info */}
-        <div className="flex items-center justify-between px-1 text-[11px] text-[#8696a0]">
+        <div className="flex items-center justify-between px-1 text-[11px] text-[#8696a0] shrink-0">
           <span>Assigned Ephemeral ID:</span>
           <span className="font-mono text-[#00a884] font-bold bg-[#111b21] px-2 py-0.5 rounded-md border border-[#3b4a54]">
             {assignedUid}
@@ -563,13 +560,13 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
         </div>
 
         {/* Start Chatting Button */}
-        <form onSubmit={handleJoin}>
+        <form onSubmit={handleJoin} className="shrink-0">
           <motion.button 
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading || !name.trim()}
-            className="w-full bg-[#00a884] hover:bg-[#008f6f] text-white font-bold py-3.5 rounded-2xl transition-all shadow-xl shadow-[#00a884]/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base cursor-pointer"
+            className="w-full bg-[#00a884] hover:bg-[#008f6f] text-white font-bold py-2.5 rounded-xl transition-all shadow-xl shadow-[#00a884]/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm cursor-pointer"
           >
             {loading ? (
               <>
@@ -584,20 +581,6 @@ const NameEntryScreen: React.FC<{ onJoin: (user: UserProfile) => void; onViewSho
             )}
           </motion.button>
         </form>
-
-        {/* Link to Static Showcase Page & GitHub */}
-        {onViewShowcase && (
-          <div className="pt-1 text-center">
-            <button
-              type="button"
-              onClick={onViewShowcase}
-              className="text-xs text-[#00a884] hover:text-[#25d366] hover:underline transition font-semibold inline-flex items-center gap-1.5"
-            >
-              <span>⭐ View Project Showcase &amp; GitHub Repo</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </div>
-        )}
       </motion.div>
     </div>
   );
@@ -2615,29 +2598,6 @@ export default function App() {
   const [unreadWhileScrolled, setUnreadWhileScrolled] = useState(0);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [viewMode, setViewMode] = useState<'app' | 'showcase'>(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash;
-      const search = window.location.search;
-      if (hash === '#showcase' || hash === '#about' || search.includes('page=showcase')) {
-        return 'showcase';
-      }
-    }
-    return 'app';
-  });
-
-  useEffect(() => {
-    const handleHash = () => {
-      if (window.location.hash === '#showcase' || window.location.hash === '#about') {
-        setViewMode('showcase');
-      } else if (window.location.hash === '#app' || window.location.hash === '#chat') {
-        setViewMode('app');
-      }
-    };
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
-
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
@@ -4401,20 +4361,9 @@ export default function App() {
     };
   }, [activeCall?.id, stream]);
 
-  if (viewMode === 'showcase') {
-    return (
-      <ShowcaseLandingPage 
-        onLaunchApp={() => {
-          window.location.hash = 'app';
-          setViewMode('app');
-        }} 
-      />
-    );
-  }
-
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#111b21] flex flex-col items-center justify-center p-4">
+      <div className="h-full h-[100dvh] w-full overflow-hidden bg-[#111b21] flex flex-col items-center justify-center p-4">
         <motion.div 
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -4438,15 +4387,7 @@ export default function App() {
   }
 
   if (!user) {
-    return (
-      <NameEntryScreen 
-        onJoin={(newUser) => setUser(newUser)} 
-        onViewShowcase={() => {
-          window.location.hash = 'showcase';
-          setViewMode('showcase');
-        }}
-      />
-    );
+    return <NameEntryScreen onJoin={(newUser) => setUser(newUser)} />;
   }
 
   return (
@@ -4484,15 +4425,6 @@ export default function App() {
           </motion.button>
 
           <div className="flex items-center gap-1 text-[#8696a0]">
-            <motion.button 
-              whileHover={{ scale: 1.1, color: "#00a884" }}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => { window.location.hash = 'showcase'; setViewMode('showcase'); }} 
-              title="Showcase Website & GitHub" 
-              className="p-2 hover:bg-[#2a3942] rounded-full transition-colors text-[#8696a0]"
-            >
-              <Globe className="w-5 h-5" />
-            </motion.button>
             <motion.button 
               whileHover={{ scale: 1.1, color: "#00a884" }}
               whileTap={{ scale: 0.92 }}
