@@ -29,7 +29,12 @@
         "groupCode": { "type": "string" },
         "lastMessage": { "type": "string" },
         "lastMessageAt": { "type": "string", "format": "date-time" },
-        "createdBy": { "type": "string" }
+        "createdBy": { "type": "string" },
+        "requestStatus": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "requestSenderId": { "type": "string" },
+        "requestReceiverId": { "type": "string" },
+        "acceptedAt": { "type": "string", "format": "date-time" },
+        "blockedBy": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["id", "type", "participants"]
     },

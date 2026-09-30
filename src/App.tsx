@@ -235,6 +235,10 @@ interface Chat {
   createdBy?: string;
   clearedAt?: Record<string, any>;
   blockedBy?: string[];
+  requestStatus?: 'pending' | 'accepted' | 'declined';
+  requestSenderId?: string;
+  requestReceiverId?: string;
+  acceptedAt?: any;
 }
 
 interface Message {
@@ -612,6 +616,8 @@ const FindPeopleModal: React.FC<{
           const u = d.data() as UserProfile;
           if (u.uid === user.uid) return;
           if (u.expiresAt && now > u.expiresAt) return;
+          // Privacy: hide users whom I have blocked, or who have blocked me
+          if (user.blockedUsers?.includes(u.uid) || u.blockedUsers?.includes(user.uid)) return;
           list.push({ ...u, photoURL: getAvatarUrl(u.uid, u.photoURL) });
         });
         list.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
@@ -626,7 +632,7 @@ const FindPeopleModal: React.FC<{
     };
     fetchUsers();
     return () => { isMounted = false; };
-  }, [user.uid]);
+  }, [user.uid, user.blockedUsers]);
 
   const filtered = allUsers.filter(u => {
     if (!searchTerm.trim()) return true;
@@ -649,7 +655,7 @@ const FindPeopleModal: React.FC<{
             </div>
             <div>
               <h2 className="text-lg font-bold text-[#e9edef] leading-tight">Find People</h2>
-              <p className="text-[11px] text-[#8696a0]">Search any active user by their name</p>
+              <p className="text-[11px] text-[#8696a0]">Search active users to send chat requests</p>
             </div>
           </div>
           <button onClick={onClose} className="text-[#8696a0] hover:text-[#e9edef] p-1"><X className="w-5 h-5" /></button>
@@ -687,7 +693,12 @@ const FindPeopleModal: React.FC<{
             </div>
           ) : (
             filtered.map((u) => {
-              const hasChat = chats.some(c => c.type === 'dm' && c.participants.includes(u.uid));
+              const existingChat = chats.find(c => c.type === 'dm' && c.participants.includes(u.uid));
+              const isPending = existingChat?.requestStatus === 'pending';
+              const isSender = isPending && existingChat?.requestSenderId === user.uid;
+              const isReceiver = isPending && existingChat?.requestReceiverId === user.uid;
+              const isAccepted = existingChat && (!existingChat.requestStatus || existingChat.requestStatus === 'accepted');
+
               const now = Date.now();
               const timeLeftMin = u.expiresAt ? Math.max(0, Math.floor((u.expiresAt - now) / 60000)) : 120;
               return (
@@ -702,13 +713,39 @@ const FindPeopleModal: React.FC<{
                       </p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => onStartChat(u)}
-                    className="px-3.5 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-sm"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>{hasChat ? 'Open' : 'Chat'}</span>
-                  </button>
+                  {isAccepted ? (
+                    <button 
+                      onClick={() => onStartChat(u)}
+                      className="px-3.5 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-sm"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Open Chat</span>
+                    </button>
+                  ) : isSender ? (
+                    <button 
+                      onClick={() => onStartChat(u)}
+                      className="px-3.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shrink-0"
+                    >
+                      <Clock className="w-3.5 h-3.5 animate-pulse" />
+                      <span>Requested ⏳</span>
+                    </button>
+                  ) : isReceiver ? (
+                    <button 
+                      onClick={() => onStartChat(u)}
+                      className="px-3.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-sm"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Respond ✨</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => onStartChat(u)}
+                      className="px-3.5 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shrink-0 shadow-sm"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Send Request</span>
+                    </button>
+                  )}
                 </div>
               );
             })
@@ -723,9 +760,22 @@ const FindPeopleModal: React.FC<{
   );
 };
 
-const ChatItem: React.FC<{ chat: Chat, active: boolean, onClick: () => void, currentUserId: string, cachedName?: string, cachedPhoto?: string }> = ({ chat, active, onClick, currentUserId, cachedName, cachedPhoto }) => {
+const ChatItem: React.FC<{ 
+  chat: Chat; 
+  active: boolean; 
+  onClick: () => void; 
+  currentUserId: string; 
+  cachedName?: string; 
+  cachedPhoto?: string;
+  onAcceptRequest?: (chatId: string) => void;
+  onDeclineRequest?: (chatId: string) => void;
+}> = ({ chat, active, onClick, currentUserId, cachedName, cachedPhoto, onAcceptRequest, onDeclineRequest }) => {
   const displayName = getChatDisplayName(chat, currentUserId, cachedName);
   const avatarUrl = getChatAvatar(chat, currentUserId, cachedPhoto);
+
+  const isPending = chat.type === 'dm' && chat.requestStatus === 'pending';
+  const isReceiver = isPending && chat.requestReceiverId === currentUserId;
+  const isSender = isPending && chat.requestSenderId === currentUserId;
 
   return (
     <motion.div 
@@ -736,7 +786,8 @@ const ChatItem: React.FC<{ chat: Chat, active: boolean, onClick: () => void, cur
         "flex items-center gap-3.5 p-3.5 cursor-pointer transition-all border-b border-[#202c33]/70 relative select-none",
         active 
           ? "bg-[#2a3942] before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:bg-[#00a884] before:rounded-r-full" 
-          : "hover:bg-[#202c33]/60"
+          : "hover:bg-[#202c33]/60",
+        isReceiver && !active && "bg-emerald-950/20"
       )}
     >
       <div className="relative shrink-0">
@@ -744,12 +795,19 @@ const ChatItem: React.FC<{ chat: Chat, active: boolean, onClick: () => void, cur
           src={avatarUrl} 
           className={cn(
             "w-12 h-12 rounded-full bg-[#3b4a54] object-cover transition-transform duration-200",
-            active ? "ring-2 ring-[#00a884] shadow-md shadow-[#00a884]/20" : ""
+            active ? "ring-2 ring-[#00a884] shadow-md shadow-[#00a884]/20" : "",
+            isReceiver ? "ring-2 ring-emerald-500/60" : ""
           )} 
           alt={displayName}
         />
         {chat.type === 'dm' ? (
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#111b21] rounded-full shadow-sm"></div>
+          isReceiver ? (
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[9px] border border-[#111b21] shadow-sm animate-pulse">
+              👋
+            </div>
+          ) : (
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#111b21] rounded-full shadow-sm"></div>
+          )
         ) : (
           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-[#00a884] text-white rounded-full flex items-center justify-center text-[9px] border border-[#111b21]">
             <Users className="w-2.5 h-2.5" />
@@ -758,18 +816,60 @@ const ChatItem: React.FC<{ chat: Chat, active: boolean, onClick: () => void, cur
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex justify-between items-baseline mb-0.5">
-          <h3 className={cn("font-medium text-sm truncate", active ? "text-white font-semibold" : "text-[#e9edef]")}>
-            {displayName}
-          </h3>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className={cn("font-medium text-sm truncate", active ? "text-white font-semibold" : "text-[#e9edef]")}>
+              {displayName}
+            </h3>
+            {isReceiver && (
+              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider shrink-0">
+                New Request
+              </span>
+            )}
+            {isSender && (
+              <span className="px-1.5 py-0.2 text-[9px] font-semibold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+                Pending
+              </span>
+            )}
+          </div>
           {chat.lastMessageAt && (
             <span className="text-[#8696a0] text-[11px] font-mono shrink-0 ml-2">
               {format(chat.lastMessageAt.toDate ? chat.lastMessageAt.toDate() : new Date(chat.lastMessageAt), 'HH:mm')}
             </span>
           )}
         </div>
-        <p className={cn("text-xs truncate leading-relaxed flex items-center gap-1", active ? "text-[#aebac1]" : "text-[#8696a0]")}>
-          {chat.lastMessage || (chat.type === 'group' ? '👥 Group ready' : 'Tap to chat')}
-        </p>
+        
+        {isReceiver ? (
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <p className="text-xs text-emerald-400/90 truncate font-medium">
+              Wants to chat with you
+            </p>
+            {onAcceptRequest && onDeclineRequest && (
+              <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => onAcceptRequest(chat.id)}
+                  className="px-2 py-0.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-[11px] font-semibold rounded-md transition shadow-sm"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeclineRequest(chat.id)}
+                  className="px-2 py-0.5 bg-[#202c33] hover:bg-red-500/20 text-[#8696a0] hover:text-red-400 text-[11px] font-medium rounded-md border border-[#3b4a54] transition"
+                >
+                  Decline
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className={cn("text-xs truncate leading-relaxed flex items-center gap-1", active ? "text-[#aebac1]" : "text-[#8696a0]")}>
+            {isSender 
+              ? '⏳ Waiting for request acceptance'
+              : (chat.lastMessage || (chat.type === 'group' ? '👥 Group ready' : 'Tap to chat'))
+            }
+          </p>
+        )}
       </div>
     </motion.div>
   );
@@ -2530,7 +2630,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [chatFilter, setChatFilter] = useState<'all' | 'direct' | 'group'>('all');
+  const [chatFilter, setChatFilter] = useState<'all' | 'direct' | 'group' | 'requests'>('all');
   const [showEmojiTray, setShowEmojiTray] = useState(false);
 
   // Developer Code Sharing & Fullscreen Viewer state (supports 10,000+ lines of code)
@@ -2685,6 +2785,11 @@ export default function App() {
         return timeB - timeA;
       });
       setChats(chatList);
+      setActiveChat(prev => {
+        if (!prev) return null;
+        const fresh = chatList.find(c => c.id === prev.id);
+        return fresh || prev;
+      });
       setChatsLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'chats');
@@ -3013,6 +3118,8 @@ export default function App() {
           const u = d.data() as UserProfile;
           if (u.uid === user.uid) return;
           if (u.expiresAt && u.expiresAt > 0 && now > u.expiresAt) return;
+          // Privacy: hide users whom I have blocked, or who have blocked me
+          if (user.blockedUsers?.includes(u.uid) || u.blockedUsers?.includes(user.uid)) return;
           const dName = (u.displayName || '').toLowerCase();
           const uName = (u.username || '').toLowerCase();
           const uidStr = (u.uid || '').toLowerCase();
@@ -3045,6 +3152,8 @@ export default function App() {
         const u = d.data() as UserProfile;
         if (u.uid === user.uid) return;
         if (u.expiresAt && u.expiresAt > 0 && now > u.expiresAt) return;
+        // Privacy: hide users whom I have blocked, or who have blocked me
+        if (user.blockedUsers?.includes(u.uid) || u.blockedUsers?.includes(user.uid)) return;
         list.push({ ...u, photoURL: getAvatarUrl(u.uid, u.photoURL) });
       });
       list.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
@@ -3058,6 +3167,11 @@ export default function App() {
     if (!user) return;
     if (targetUser.uid === user.uid) {
       showNotification("You cannot chat with yourself!");
+      return;
+    }
+
+    if (user.blockedUsers?.includes(targetUser.uid)) {
+      showNotification("You have blocked this contact. Unblock them first in Settings.");
       return;
     }
 
@@ -3098,7 +3212,10 @@ export default function App() {
         name: `${user.displayName} & ${targetUser.displayName}`,
         participants: [user.uid, targetUser.uid],
         participantsDetails,
-        lastMessage: '👋 Started a new chat',
+        requestStatus: 'pending',
+        requestSenderId: user.uid,
+        requestReceiverId: targetUser.uid,
+        lastMessage: '👋 Chat request sent',
         lastMessageAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
@@ -3109,7 +3226,10 @@ export default function App() {
         name: `${user.displayName} & ${targetUser.displayName}`,
         participants: [user.uid, targetUser.uid],
         participantsDetails,
-        lastMessage: '👋 Started a new chat'
+        requestStatus: 'pending',
+        requestSenderId: user.uid,
+        requestReceiverId: targetUser.uid,
+        lastMessage: '👋 Chat request sent'
       };
 
       setUsersCache(prev => ({
@@ -3120,10 +3240,66 @@ export default function App() {
       setActiveChat(newChatObj);
       setSearchQuery('');
       setShowFindPeopleModal(false);
-      showNotification(`Chat started with ${targetUser.displayName}!`);
+      showNotification(`Chat request sent to ${targetUser.displayName}!`);
     } catch (err) {
-      console.error('Failed to start chat', err);
-      showNotification('Could not start chat with this user.');
+      console.error('Failed to send chat request', err);
+      showNotification('Could not send chat request.');
+    }
+  };
+
+  const handleAcceptChatRequest = async (chatId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'chats', chatId), {
+        requestStatus: 'accepted',
+        acceptedAt: serverTimestamp(),
+        lastMessage: '🤝 Chat request accepted',
+        lastMessageAt: serverTimestamp(),
+      });
+
+      // System notification message in the chat
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        chatId,
+        senderId: 'system',
+        senderName: 'System',
+        text: '🤝 Chat request accepted! You can now send end-to-end encrypted messages and make voice calls.',
+        type: 'text',
+        createdAt: serverTimestamp(),
+      });
+
+      setActiveChat(prev => (prev?.id === chatId ? { ...prev, requestStatus: 'accepted' } : prev));
+      showNotification('Chat request accepted! You can now chat.');
+    } catch (err) {
+      console.error('Failed to accept chat request:', err);
+      showNotification('Failed to accept request.');
+    }
+  };
+
+  const handleDeclineChatRequest = async (chatId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'chats', chatId));
+      if (activeChat?.id === chatId) {
+        setActiveChat(null);
+      }
+      showNotification('Chat request declined.');
+    } catch (err) {
+      console.error('Failed to decline chat request:', err);
+      showNotification('Failed to decline request.');
+    }
+  };
+
+  const handleCancelChatRequest = async (chatId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'chats', chatId));
+      if (activeChat?.id === chatId) {
+        setActiveChat(null);
+      }
+      showNotification('Chat request canceled.');
+    } catch (err) {
+      console.error('Failed to cancel chat request:', err);
+      showNotification('Failed to cancel request.');
     }
   };
 
@@ -3287,13 +3463,18 @@ export default function App() {
   const handleSendVoiceNote = async (audioBlob: Blob, duration: number) => {
     if (!activeChat || !user) return;
 
+    // Request guard
+    if (activeChat.type === 'dm' && activeChat.requestStatus === 'pending') {
+      showNotification(activeChat.requestSenderId === user.uid ? "Waiting for user to accept your chat request." : "Please accept the chat request to send voice notes.");
+      return;
+    }
+
     // Block guard
     if (activeChat.type === 'dm') {
       const otherUid = activeChat.participants.find(p => p !== user.uid);
       const isBlockedByMe = otherUid ? (user.blockedUsers?.includes(otherUid) || false) : false;
-      const isBlockedByOtherUser = otherUid ? (activeChat.blockedBy?.includes(otherUid) || false) : false;
-      if (isBlockedByMe || isBlockedByOtherUser || isBlockedByOther) {
-        showNotification("Cannot send voice note. This contact is blocked.");
+      if (isBlockedByMe) {
+        showNotification("You have blocked this contact. Unblock to send voice notes.");
         return;
       }
     }
@@ -3523,13 +3704,18 @@ export default function App() {
     e?.preventDefault();
     if (!newMessage.trim() || !activeChat || !user) return;
 
+    // Request guard
+    if (activeChat.type === 'dm' && activeChat.requestStatus === 'pending') {
+      showNotification(activeChat.requestSenderId === user.uid ? "Waiting for user to accept your chat request." : "Please accept the chat request to send messages.");
+      return;
+    }
+
     // Block guard
     if (activeChat.type === 'dm') {
       const otherUid = activeChat.participants.find(p => p !== user.uid);
       const isBlockedByMe = otherUid ? (user.blockedUsers?.includes(otherUid) || false) : false;
-      const isBlockedByOtherUser = otherUid ? (activeChat.blockedBy?.includes(otherUid) || false) : false;
-      if (isBlockedByMe || isBlockedByOtherUser || isBlockedByOther) {
-        showNotification("Cannot send message. This conversation is blocked.");
+      if (isBlockedByMe) {
+        showNotification("You have blocked this contact. Unblock to send messages.");
         return;
       }
     }
@@ -3600,13 +3786,18 @@ export default function App() {
   const handleSendCode = async (codeData: { code: string; language: string; title?: string }) => {
     if (!activeChat || !user || !codeData.code.trim()) return;
 
+    // Request guard
+    if (activeChat.type === 'dm' && activeChat.requestStatus === 'pending') {
+      showNotification(activeChat.requestSenderId === user.uid ? "Waiting for user to accept your chat request." : "Please accept the chat request to send code.");
+      return;
+    }
+
     // Block guard
     if (activeChat.type === 'dm') {
       const otherUid = activeChat.participants.find(p => p !== user.uid);
       const isBlockedByMe = otherUid ? (user.blockedUsers?.includes(otherUid) || false) : false;
-      const isBlockedByOtherUser = otherUid ? (activeChat.blockedBy?.includes(otherUid) || false) : false;
-      if (isBlockedByMe || isBlockedByOtherUser || isBlockedByOther) {
-        showNotification("Cannot send code. This conversation is blocked.");
+      if (isBlockedByMe) {
+        showNotification("You have blocked this contact. Unblock to send code.");
         return;
       }
     }
@@ -3688,13 +3879,18 @@ export default function App() {
   const processFileAndSend = async (file: File) => {
     if (!file || !activeChat || !user) return;
 
+    // Request guard
+    if (activeChat.type === 'dm' && activeChat.requestStatus === 'pending') {
+      showNotification(activeChat.requestSenderId === user.uid ? "Waiting for user to accept your chat request." : "Please accept the chat request to send files.");
+      return;
+    }
+
     // Block guard
     if (activeChat.type === 'dm') {
       const otherUid = activeChat.participants.find(p => p !== user.uid);
       const isBlockedByMe = otherUid ? (user.blockedUsers?.includes(otherUid) || false) : false;
-      const isBlockedByOtherUser = otherUid ? (activeChat.blockedBy?.includes(otherUid) || false) : false;
-      if (isBlockedByMe || isBlockedByOtherUser || isBlockedByOther) {
-        showNotification("Cannot send file. This conversation is blocked.");
+      if (isBlockedByMe) {
+        showNotification("You have blocked this contact. Unblock to send files.");
         return;
       }
     }
@@ -3952,7 +4148,12 @@ export default function App() {
           name: `${user.displayName} & ${scannedName}`,
           participants: [user.uid, scannedUid],
           participantsDetails,
+          requestStatus: 'pending',
+          requestSenderId: user.uid,
+          requestReceiverId: scannedUid,
+          lastMessage: '👋 Chat request sent via QR',
           lastMessageAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
         });
 
         setUsersCache(prev => ({
@@ -3965,10 +4166,14 @@ export default function App() {
           type: 'dm', 
           name: `${user.displayName} & ${scannedName}`, 
           participants: [user.uid, scannedUid],
-          participantsDetails
+          participantsDetails,
+          requestStatus: 'pending',
+          requestSenderId: user.uid,
+          requestReceiverId: scannedUid,
+          lastMessage: '👋 Chat request sent via QR'
         });
+        showNotification(`Chat request sent to ${scannedName}!`);
       }
-      showNotification('Chat connected!');
     } catch (error) {
       console.error('Failed to start DM', error);
       showNotification('Could not connect with user.');
@@ -3981,14 +4186,17 @@ export default function App() {
     const otherUid = activeChat.participants.find(p => p !== user.uid);
 
     if (!isGroup && otherUid) {
+      if (activeChat.requestStatus === 'pending') {
+        showNotification('Voice call will be available once the chat request is accepted.');
+        return;
+      }
       const isBlockedByMe = user.blockedUsers?.includes(otherUid) || false;
-      const isBlockedByOtherUser = activeChat.blockedBy?.includes(otherUid) || false;
       if (isBlockedByMe) {
         showNotification('Cannot call a blocked contact. Please unblock first.');
         return;
       }
-      if (isBlockedByOtherUser || isBlockedByOther) {
-        showNotification('Cannot place call. User is unavailable.');
+      if (isBlockedByOther) {
+        showNotification('Cannot place call. User is currently unavailable.');
         return;
       }
     }
@@ -4493,24 +4701,52 @@ export default function App() {
             )}
           </div>
 
-          {/* Quick Filter Tabs (All / Direct / Groups) */}
-          <div className="flex items-center gap-1.5 px-0.5">
-            {(['all', 'direct', 'group'] as const).map(tab => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setChatFilter(tab)}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-full transition-all capitalize select-none",
-                  chatFilter === tab 
-                    ? "bg-[#00a884] text-white shadow-sm font-semibold" 
-                    : "bg-[#202c33] text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
+          {/* Quick Filter Tabs (All / Direct / Groups / Requests) */}
+          {(() => {
+            const incomingRequestsCount = chats.filter(c => c.type === 'dm' && c.requestStatus === 'pending' && c.requestReceiverId === user.uid).length;
+            return (
+              <>
+                <div className="flex items-center gap-1.5 px-0.5 overflow-x-auto no-scrollbar">
+                  {(['all', 'direct', 'group', 'requests'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setChatFilter(tab)}
+                      className={cn(
+                        "px-3 py-1 text-xs font-medium rounded-full transition-all capitalize select-none shrink-0 flex items-center gap-1",
+                        chatFilter === tab 
+                          ? "bg-[#00a884] text-white shadow-sm font-semibold" 
+                          : "bg-[#202c33] text-[#8696a0] hover:text-[#e9edef] hover:bg-[#2a3942]"
+                      )}
+                    >
+                      <span>{tab === 'all' ? 'All' : tab === 'direct' ? 'Direct' : tab === 'group' ? 'Groups' : 'Requests'}</span>
+                      {tab === 'requests' && incomingRequestsCount > 0 && (
+                        <span className={cn(
+                          "px-1.5 py-0.2 rounded-full text-[10px] font-bold",
+                          chatFilter === 'requests' ? "bg-white text-[#00a884]" : "bg-emerald-500 text-white animate-pulse"
+                        )}>
+                          {incomingRequestsCount}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {incomingRequestsCount > 0 && chatFilter !== 'requests' && (
+                  <div 
+                    onClick={() => setChatFilter('requests')}
+                    className="mt-2 p-2 bg-emerald-950/40 hover:bg-emerald-950/60 border border-emerald-500/40 rounded-xl flex items-center justify-between text-xs text-emerald-300 cursor-pointer transition shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse shrink-0" />
+                      <span>{incomingRequestsCount} pending chat request{incomingRequestsCount > 1 ? 's' : ''}</span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-emerald-400 underline">View</span>
+                  </div>
                 )}
-              >
-                {tab === 'all' ? 'All' : tab === 'direct' ? 'Direct' : 'Groups'}
-              </button>
-            ))}
-          </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Search Results: People Found on Chat 120 */}
@@ -4529,7 +4765,12 @@ export default function App() {
             {searchedUsers.length > 0 ? (
               <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5 custom-scrollbar">
                 {searchedUsers.map((su) => {
-                  const hasChat = chats.some(c => c.type === 'dm' && c.participants.includes(su.uid));
+                  const existingChat = chats.find(c => c.type === 'dm' && c.participants.includes(su.uid));
+                  const isPending = existingChat?.requestStatus === 'pending';
+                  const isSender = isPending && existingChat?.requestSenderId === user.uid;
+                  const isReceiver = isPending && existingChat?.requestReceiverId === user.uid;
+                  const isAccepted = existingChat && (!existingChat.requestStatus || existingChat.requestStatus === 'accepted');
+
                   const now = Date.now();
                   const timeLeft = su.expiresAt ? Math.max(0, Math.floor((su.expiresAt - now) / 60000)) : 120;
                   return (
@@ -4544,13 +4785,39 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleStartDirectChat(su)}
-                        className="px-3 py-1 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-lg transition shrink-0 flex items-center gap-1 shadow-sm"
-                      >
-                        <MessageCircle className="w-3 h-3" />
-                        <span>{hasChat ? 'Open' : 'Chat'}</span>
-                      </button>
+                      {isAccepted ? (
+                        <button
+                          onClick={() => handleStartDirectChat(su)}
+                          className="px-2.5 py-1 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-lg transition shrink-0 flex items-center gap-1 shadow-sm"
+                        >
+                          <MessageCircle className="w-3 h-3" />
+                          <span>Open</span>
+                        </button>
+                      ) : isSender ? (
+                        <button
+                          onClick={() => handleStartDirectChat(su)}
+                          className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-lg transition shrink-0 flex items-center gap-1"
+                        >
+                          <Clock className="w-3 h-3 animate-pulse" />
+                          <span>Requested</span>
+                        </button>
+                      ) : isReceiver ? (
+                        <button
+                          onClick={() => handleStartDirectChat(su)}
+                          className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold rounded-lg transition shrink-0 flex items-center gap-1 shadow-sm"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>Respond</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStartDirectChat(su)}
+                          className="px-2.5 py-1 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-lg transition shrink-0 flex items-center gap-1 shadow-sm"
+                        >
+                          <UserPlus className="w-3 h-3" />
+                          <span>Request</span>
+                        </button>
+                      )}
                     </div>
                   );
                 })}
@@ -4579,6 +4846,9 @@ export default function App() {
             </div>
           ) : (() => {
             const filteredChats = chats.filter(c => {
+              if (chatFilter === 'requests') {
+                return c.type === 'dm' && c.requestStatus === 'pending' && c.requestReceiverId === user.uid;
+              }
               if (chatFilter === 'direct' && c.type !== 'dm') return false;
               if (chatFilter === 'group' && c.type !== 'group') return false;
               const otherUid = c.participants.find(p => p !== user.uid);
@@ -4593,10 +4863,20 @@ export default function App() {
                     <MessageCircle className="w-8 h-8" />
                   </div>
                   <h4 className="text-sm font-semibold text-[#e9edef] mb-1">
-                    {searchQuery ? 'No matching chats' : chatFilter !== 'all' ? `No ${chatFilter} chats yet` : 'No conversations yet'}
+                    {searchQuery 
+                      ? 'No matching chats' 
+                      : chatFilter === 'requests'
+                      ? 'No pending chat requests'
+                      : chatFilter !== 'all' 
+                      ? `No ${chatFilter} chats yet` 
+                      : 'No conversations yet'}
                   </h4>
                   <p className="text-xs text-[#8696a0] max-w-xs mb-4">
-                    {searchQuery ? 'Try searching a different name or start a new chat.' : 'Scan a friend\'s QR code or start a new group to begin messaging.'}
+                    {searchQuery 
+                      ? 'Try searching a different name or start a new chat.' 
+                      : chatFilter === 'requests'
+                      ? 'When other users search for your name and request to chat, they will appear here for you to accept or decline.'
+                      : 'Scan a friend\'s QR code or start a new group to begin messaging.'}
                   </p>
                   <div className="flex flex-wrap justify-center gap-2">
                     <button
@@ -4629,6 +4909,8 @@ export default function App() {
                   currentUserId={user.uid}
                   cachedName={otherUid ? usersCache[otherUid]?.displayName : undefined}
                   cachedPhoto={otherUid ? usersCache[otherUid]?.photoURL : undefined}
+                  onAcceptRequest={(cId) => handleAcceptChatRequest(cId)}
+                  onDeclineRequest={(cId) => handleDeclineChatRequest(cId)}
                 />
               );
             });
@@ -4698,9 +4980,12 @@ export default function App() {
                 </div>
               </div>
             ) : (() => {
-              const otherUid = activeChat.participants.find(p => p !== user.uid);
+              const otherUid = activeChat.type === 'dm' ? activeChat.participants.find(p => p !== user.uid) : undefined;
               const isBlockedByMe = otherUid ? (user.blockedUsers?.includes(otherUid) || false) : false;
-              const isBlocked = isBlockedByMe || isBlockedByOther;
+              const isChatPending = activeChat.type === 'dm' && activeChat.requestStatus === 'pending';
+              const isRequestReceiver = isChatPending && activeChat.requestReceiverId === user.uid;
+              const isRequestSender = isChatPending && activeChat.requestSenderId === user.uid;
+
               const headerDisplayName = getChatDisplayName(activeChat, user.uid, otherUid ? usersCache[otherUid]?.displayName : undefined);
               const headerAvatarUrl = getChatAvatar(activeChat, user.uid, otherUid ? usersCache[otherUid]?.photoURL : undefined);
 
@@ -4719,7 +5004,7 @@ export default function App() {
                       }
                     }}
                     className="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-90 transition group min-w-0 flex-1 mr-2"
-                    title={activeChat.type === 'dm' ? "Click to view profile & block/unblock options" : "Click to view group info"}
+                    title={activeChat.type === 'dm' ? "Click to view profile & options" : "Click to view group info"}
                   >
                     <button 
                       onClick={(e) => { e.stopPropagation(); setActiveChat(null); }} 
@@ -4734,8 +5019,8 @@ export default function App() {
                         className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover bg-[#3b4a54] border border-white/10 group-hover:ring-2 group-hover:ring-[#00a884] transition" 
                         alt={headerDisplayName}
                       />
-                      {isBlocked && (
-                        <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-0.5" title="Blocked">
+                      {isBlockedByMe && (
+                        <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-0.5" title="You blocked this contact">
                           <Ban className="w-3 h-3 text-white" />
                         </div>
                       )}
@@ -4744,14 +5029,21 @@ export default function App() {
                       <div className="flex items-center gap-1.5 min-w-0">
                         <h3 className="text-[#e9edef] font-medium leading-tight group-hover:text-[#00a884] transition truncate text-sm sm:text-base">{headerDisplayName}</h3>
                         {isBlockedByMe && <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.2 rounded font-medium shrink-0">Blocked</span>}
-                        {isBlockedByOther && <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.2 rounded font-medium shrink-0">Unavailable</span>}
+                        {isRequestReceiver && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-medium shrink-0">Incoming Request</span>}
+                        {isRequestSender && <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.2 rounded font-medium shrink-0">Request Pending</span>}
                       </div>
                       <p className="text-[#8696a0] text-[11px] sm:text-xs truncate flex items-center gap-1">
                         <span className="text-[#00a884] text-[10px]">🔒</span>
                         <span>
                           {activeChat.type === 'group' 
                             ? `${activeChat.participants.length} members • E2EE` 
-                            : isBlockedByMe ? 'Blocked contact' : isBlockedByOther ? 'Communications disabled' : 'online • encrypted'}
+                            : isBlockedByMe 
+                            ? 'Blocked contact • Tap to unblock' 
+                            : isRequestReceiver 
+                            ? 'Pending request • Tap to accept' 
+                            : isRequestSender 
+                            ? 'Request sent • Waiting for approval' 
+                            : 'online • encrypted'}
                         </span>
                       </p>
                     </div>
@@ -4760,11 +5052,11 @@ export default function App() {
                     {/* Voice-only calling button */}
                     <button 
                       onClick={startVoiceCall} 
-                      title={isBlockedByMe ? "Cannot call a blocked contact" : isBlockedByOther ? "Call unavailable" : "Start voice call"} 
-                      disabled={isBlocked}
+                      title={isBlockedByMe ? "Cannot call a blocked contact" : isChatPending ? "Voice calls available once request is accepted" : "Start voice call"} 
+                      disabled={isBlockedByMe || isChatPending}
                       className={cn(
                         "p-2 sm:p-2.5 rounded-full min-w-[36px] min-h-[36px] flex items-center justify-center transition",
-                        isBlocked ? "opacity-30 cursor-not-allowed" : "hover:text-[#00a884] hover:bg-[#3b4a54]/50 text-[#8696a0]"
+                        (isBlockedByMe || isChatPending) ? "opacity-30 cursor-not-allowed" : "hover:text-[#00a884] hover:bg-[#3b4a54]/50 text-[#8696a0]"
                       )}
                     >
                       <Phone className="w-5 h-5" />
@@ -4848,7 +5140,7 @@ export default function App() {
                               className="w-full px-4 py-2.5 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-2.5 transition border-t border-[#3b4a54]/50"
                             >
                               <Ban className="w-4 h-4 text-red-400" />
-                              <span>{isBlocked ? 'Unblock contact' : 'Block contact'}</span>
+                              <span>{isBlockedByMe ? 'Unblock contact' : 'Block contact'}</span>
                             </button>
                           )}
 
@@ -4884,21 +5176,98 @@ export default function App() {
                   </div>
                 </div>
 
-                {visibleMessages.length === 0 && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col items-center justify-center my-auto py-12 text-center select-none"
-                  >
-                    <div className="w-16 h-16 rounded-3xl bg-[#202c33]/80 border border-[#3b4a54]/50 text-[#00a884] flex items-center justify-center mb-3 shadow-inner">
-                      <MessageCircle className="w-8 h-8" />
-                    </div>
-                    <p className="text-[#e9edef] font-semibold text-sm mb-1">No messages here yet</p>
-                    <p className="text-[#8696a0] text-xs max-w-xs leading-relaxed">
-                      Say hello, share a voice note, or drop code snippets. All messages disappear automatically in 1 hour.
-                    </p>
-                  </motion.div>
-                )}
+                {visibleMessages.length === 0 && (() => {
+                  const otherUid = activeChat.type === 'dm' ? activeChat.participants.find(p => p !== user.uid) : undefined;
+                  const isChatPending = activeChat.type === 'dm' && activeChat.requestStatus === 'pending';
+                  const isRequestReceiver = isChatPending && activeChat.requestReceiverId === user.uid;
+                  const isRequestSender = isChatPending && activeChat.requestSenderId === user.uid;
+                  const headerDisplayName = getChatDisplayName(activeChat, user.uid, otherUid ? usersCache[otherUid]?.displayName : undefined);
+                  const headerAvatarUrl = getChatAvatar(activeChat, user.uid, otherUid ? usersCache[otherUid]?.photoURL : undefined);
+
+                  if (isRequestReceiver) {
+                    return (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center justify-center my-auto py-8 text-center select-none max-w-sm mx-auto px-4"
+                      >
+                        <div className="relative mb-3">
+                          <img 
+                            src={headerAvatarUrl} 
+                            className="w-20 h-20 rounded-full object-cover border-2 border-emerald-500 shadow-xl" 
+                            alt={headerDisplayName} 
+                          />
+                          <span className="absolute bottom-0 right-0 p-1.5 bg-emerald-500 text-white rounded-full shadow-md">
+                            <Sparkles className="w-4 h-4" />
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-bold text-[#e9edef] mb-1">{headerDisplayName} wants to chat!</h3>
+                        <p className="text-xs text-[#8696a0] leading-relaxed mb-5">
+                          Accept this chat request to exchange end-to-end encrypted messages, voice notes, code snippets, and voice calls.
+                        </p>
+                        <div className="flex items-center gap-2.5 w-full justify-center">
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptChatRequest(activeChat.id)}
+                            className="flex-1 py-2.5 px-4 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-md"
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>Accept Request</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeclineChatRequest(activeChat.id)}
+                            className="py-2.5 px-4 bg-[#202c33] hover:bg-red-500/20 text-[#8696a0] hover:text-red-400 text-xs font-semibold rounded-xl border border-[#3b4a54] transition flex items-center justify-center gap-1.5"
+                          >
+                            <X className="w-4 h-4" />
+                            <span>Decline</span>
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+
+                  if (isRequestSender) {
+                    return (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex flex-col items-center justify-center my-auto py-8 text-center select-none max-w-sm mx-auto px-4"
+                      >
+                        <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mb-3 shadow-inner">
+                          <Clock className="w-8 h-8 animate-pulse" />
+                        </div>
+                        <h3 className="text-lg font-bold text-[#e9edef] mb-1">Chat Request Sent</h3>
+                        <p className="text-xs text-[#8696a0] leading-relaxed mb-5">
+                          Waiting for <span className="text-[#e9edef] font-semibold">{headerDisplayName}</span> to accept your chat request. Once accepted, you can chat freely.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelChatRequest(activeChat.id)}
+                          className="px-4 py-2 bg-[#202c33] hover:bg-red-500/20 text-[#8696a0] hover:text-red-400 text-xs font-semibold rounded-xl border border-[#3b4a54] transition shadow-sm"
+                        >
+                          Cancel Request
+                        </button>
+                      </motion.div>
+                    );
+                  }
+
+                  return (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex flex-col items-center justify-center my-auto py-12 text-center select-none"
+                    >
+                      <div className="w-16 h-16 rounded-3xl bg-[#202c33]/80 border border-[#3b4a54]/50 text-[#00a884] flex items-center justify-center mb-3 shadow-inner">
+                        <MessageCircle className="w-8 h-8" />
+                      </div>
+                      <p className="text-[#e9edef] font-semibold text-sm mb-1">No messages here yet</p>
+                      <p className="text-[#8696a0] text-xs max-w-xs leading-relaxed">
+                        Say hello, share a voice note, or drop code snippets. All messages disappear automatically in 1 hour.
+                      </p>
+                    </motion.div>
+                  );
+                })()}
 
                 {visibleMessages.map((msg, idx) => {
                   const prevMsg = idx > 0 ? visibleMessages[idx - 1] : null;
@@ -4961,10 +5330,14 @@ export default function App() {
               </AnimatePresence>
             </div>
 
-            {/* Input Area (or Blocked Banner) */}
+            {/* Input Area (or Request Actions or Blocked Banner) */}
             {(() => {
               const otherUid = activeChat.type === 'dm' ? activeChat.participants.find(p => p !== user.uid) : undefined;
               const isBlockedByMe = otherUid ? (user.blockedUsers?.includes(otherUid) || false) : false;
+              const isChatPending = activeChat.type === 'dm' && activeChat.requestStatus === 'pending';
+              const isRequestReceiver = isChatPending && activeChat.requestReceiverId === user.uid;
+              const isRequestSender = isChatPending && activeChat.requestSenderId === user.uid;
+              const headerDisplayName = getChatDisplayName(activeChat, user.uid, otherUid ? usersCache[otherUid]?.displayName : undefined);
 
               if (isBlockedByMe && otherUid) {
                 return (
@@ -4984,11 +5357,50 @@ export default function App() {
                 );
               }
 
-              if (isBlockedByOther && otherUid) {
+              if (isRequestReceiver && otherUid) {
                 return (
-                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center gap-2.5 border-t border-red-500/30 shrink-0 w-full min-w-0 text-red-400 text-xs sm:text-sm">
-                    <Ban className="w-5 h-5 shrink-0" />
-                    <span>You cannot send messages or make calls to this contact because communications are blocked.</span>
+                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-emerald-500/30 gap-3 shrink-0 w-full min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Sparkles className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <span className="text-xs sm:text-sm text-[#e9edef] truncate">
+                        <strong className="text-white">{headerDisplayName}</strong> sent you a chat request
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleAcceptChatRequest(activeChat.id)}
+                        className="px-3.5 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white font-semibold rounded-xl text-xs transition shadow-sm flex items-center gap-1"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Accept</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeclineChatRequest(activeChat.id)}
+                        className="px-3.5 py-1.5 bg-[#111b21] hover:bg-red-500/20 text-[#8696a0] hover:text-red-400 font-semibold rounded-xl text-xs border border-[#3b4a54] transition"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isRequestSender && otherUid) {
+                return (
+                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-amber-500/30 gap-3 shrink-0 w-full min-w-0">
+                    <div className="flex items-center gap-2 text-amber-300 text-xs sm:text-sm min-w-0">
+                      <Clock className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
+                      <span className="truncate">Waiting for {headerDisplayName} to accept your request before messaging...</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCancelChatRequest(activeChat.id)}
+                      className="px-3 py-1.5 bg-[#111b21] hover:bg-red-500/20 text-[#8696a0] hover:text-red-400 font-semibold rounded-xl text-xs border border-[#3b4a54] transition shrink-0"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 );
               }
