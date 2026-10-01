@@ -3338,10 +3338,10 @@ export default function App() {
         name: `${user.displayName} & ${targetUser.displayName}`,
         participants: [user.uid, targetUser.uid],
         participantsDetails,
-        requestStatus: 'pending',
+        requestStatus: 'accepted',
         requestSenderId: user.uid,
         requestReceiverId: targetUser.uid,
-        lastMessage: '👋 Chat request sent',
+        lastMessage: '👋 Chat started',
         lastMessageAt: serverTimestamp(),
         createdAt: serverTimestamp(),
       });
@@ -3352,10 +3352,10 @@ export default function App() {
         name: `${user.displayName} & ${targetUser.displayName}`,
         participants: [user.uid, targetUser.uid],
         participantsDetails,
-        requestStatus: 'pending',
+        requestStatus: 'accepted',
         requestSenderId: user.uid,
         requestReceiverId: targetUser.uid,
-        lastMessage: '👋 Chat request sent'
+        lastMessage: '👋 Chat started'
       };
 
       setUsersCache(prev => ({
@@ -3366,10 +3366,10 @@ export default function App() {
       setActiveChat(newChatObj);
       setSearchQuery('');
       setShowFindPeopleModal(false);
-      showNotification(`Chat request sent to ${targetUser.displayName}!`);
+      showNotification(`Chat opened with ${targetUser.displayName}!`);
     } catch (err) {
-      console.error('Failed to send chat request', err);
-      showNotification('Could not send chat request.');
+      console.error('Failed to open chat', err);
+      showNotification('Could not open chat.');
     }
   };
 
@@ -3589,10 +3589,14 @@ export default function App() {
   const handleSendVoiceNote = async (audioBlob: Blob, duration: number) => {
     if (!activeChat || !user) return;
 
-    // Request guard
+    // Auto-accept request upon sending
     if (activeChat.type === 'dm' && activeChat.requestStatus === 'pending') {
-      showNotification(activeChat.requestSenderId === user.uid ? "Waiting for user to accept your chat request." : "Please accept the chat request to send voice notes.");
-      return;
+      try {
+        await updateDoc(doc(db, 'chats', activeChat.id), { requestStatus: 'accepted' });
+        setActiveChat(prev => prev ? { ...prev, requestStatus: 'accepted' } : null);
+      } catch (e) {
+        console.warn('Auto accept voice note warning:', e);
+      }
     }
 
     // Block guard
@@ -3830,10 +3834,14 @@ export default function App() {
     e?.preventDefault();
     if (!newMessage.trim() || !activeChat || !user) return;
 
-    // Request guard
+    // Auto-accept request upon sending
     if (activeChat.type === 'dm' && activeChat.requestStatus === 'pending') {
-      showNotification(activeChat.requestSenderId === user.uid ? "Waiting for user to accept your chat request." : "Please accept the chat request to send messages.");
-      return;
+      try {
+        await updateDoc(doc(db, 'chats', activeChat.id), { requestStatus: 'accepted' });
+        setActiveChat(prev => prev ? { ...prev, requestStatus: 'accepted' } : null);
+      } catch (e) {
+        console.warn('Auto accept message warning:', e);
+      }
     }
 
     // Block guard
@@ -4725,10 +4733,10 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen h-[100dvh] w-full max-w-full bg-[#111b21] overflow-hidden">
+    <div className="w-full h-full min-h-0 flex-1 flex flex-col md:flex-row bg-[#111b21] overflow-hidden relative">
       {/* Sidebar */}
       <div className={cn(
-        "w-full md:w-[400px] border-r border-[#3b4a54] flex flex-col transition-all h-full max-w-full",
+        "w-full md:w-[400px] border-r border-[#3b4a54] flex flex-col transition-all h-full min-h-0 max-w-full shrink-0",
         activeChat ? "hidden md:flex" : "flex"
       )}>
         {/* Chat 120 Brand Header */}
@@ -4989,7 +4997,7 @@ export default function App() {
         )}
 
         {/* Chat List */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
           {chatsLoading ? (
             <div className="p-4 space-y-4">
               {[1, 2, 3, 4, 5].map(i => (
@@ -5088,7 +5096,7 @@ export default function App() {
 
       {/* Main Chat Area */}
       <div className={cn(
-        "flex-1 w-full min-w-0 max-w-full flex flex-col bg-[#0b141a] relative overflow-hidden h-full",
+        "flex-1 w-full min-w-0 max-w-full flex flex-col bg-[#0b141a] relative overflow-hidden h-full min-h-0",
         !activeChat ? "hidden md:flex items-center justify-center" : "flex"
       )}>
         {activeChat ? (
@@ -5340,10 +5348,10 @@ export default function App() {
             <div 
               ref={chatContainerRef}
               onScroll={handleChatScroll}
-              className="flex-1 w-full min-w-0 min-h-0 max-w-full overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 chat-wallpaper custom-scrollbar relative"
+              className="flex-1 w-full min-w-0 min-h-0 max-w-full overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 chat-wallpaper custom-scrollbar overscroll-contain relative"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
-              <div className="flex flex-col min-h-full w-full min-w-0 max-w-full justify-end">
+              <div className="flex flex-col min-h-full w-full min-w-0 max-w-full">
                 {/* 1-Hour Disappearing Message Notice */}
                 <div className="flex justify-center mb-3">
                   <div className="bg-[#182229]/90 border border-[#00a884]/30 rounded-xl px-3.5 py-1.5 text-center text-xs text-[#8696a0] max-w-md shadow-sm backdrop-blur-sm select-none">
@@ -5431,7 +5439,7 @@ export default function App() {
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex flex-col items-center justify-center my-auto py-12 text-center select-none"
+                      className="flex-1 flex flex-col items-center justify-center my-auto py-8 text-center select-none"
                     >
                       <div className="w-16 h-16 rounded-3xl bg-[#202c33]/80 border border-[#3b4a54]/50 text-[#00a884] flex items-center justify-center mb-3 shadow-inner">
                         <MessageCircle className="w-8 h-8" />
