@@ -97,6 +97,7 @@ import {
   getAnimalById, 
   generateShortUserId, 
   createAnimalSvgDataUri,
+  createGroupSvgDataUri,
   AnimalAvatar 
 } from './lib/avatars';
 import { e2ee } from './lib/crypto';
@@ -268,10 +269,13 @@ interface Message {
   createdAt: any;
 }
 
-// Helpers for displaying correct name and avatar (Friend's name for direct chats)
+// Helpers for displaying correct name and avatar (Friend's name for direct chats, or You for Notes)
 const getChatDisplayName = (chat: Chat, currentUserId: string, cachedName?: string): string => {
   if (chat.type === 'group') return chat.name;
   const otherId = chat.participants.find(p => p !== currentUserId);
+  if (!otherId) {
+    return chat.name || 'You (Notes)';
+  }
   if (otherId && chat.participantsDetails?.[otherId]?.displayName) {
     return chat.participantsDetails[otherId].displayName;
   }
@@ -286,13 +290,16 @@ const getChatDisplayName = (chat: Chat, currentUserId: string, cachedName?: stri
 };
 
 const getChatAvatar = (chat: Chat, currentUserId: string, cachedPhoto?: string): string => {
-  if (chat.type === 'group') return getAvatarUrl(chat.id);
-  const otherId = chat.participants.find(p => p !== currentUserId);
-  if (otherId && chat.participantsDetails?.[otherId]?.photoURL) {
-    return chat.participantsDetails[otherId].photoURL;
+  if (chat.type === 'group') {
+    return createGroupSvgDataUri(chat.id, chat.name);
   }
-  if (cachedPhoto) return cachedPhoto;
-  return getAvatarUrl(otherId || chat.id);
+  const otherId = chat.participants.find(p => p !== currentUserId);
+  if (!otherId) {
+    const rawPhoto = chat.participantsDetails?.[currentUserId]?.photoURL || cachedPhoto;
+    return getAvatarUrl(currentUserId, rawPhoto);
+  }
+  const rawPhoto = chat.participantsDetails?.[otherId]?.photoURL || cachedPhoto;
+  return getAvatarUrl(otherId, rawPhoto);
 };
 
 const formatDatePill = (timestamp: any): string => {
@@ -674,6 +681,31 @@ const FindPeopleModal: React.FC<{
           />
         </div>
 
+        {/* Pinned: Message Yourself (Notes / Instant Test) */}
+        <div className="mb-2 p-2.5 rounded-xl bg-gradient-to-r from-[#00a884]/20 via-[#05cd99]/10 to-[#202c33] border border-[#00a884]/40 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <img src={getAvatarUrl(user.uid, user.photoURL)} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#00a884]" alt="You" />
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-[#111b21]"></span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white truncate">{user.displayName} (You)</span>
+                <span className="text-[9px] bg-[#00a884]/30 text-emerald-300 px-1.5 py-0.2 rounded font-bold border border-[#00a884]/40 uppercase tracking-wider">Notes</span>
+              </div>
+              <p className="text-[10px] text-[#8696a0] truncate">Message yourself • Test chat box, code & files</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onStartChat(user)}
+            className="px-3 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-xl transition shadow flex items-center gap-1 shrink-0 cursor-pointer"
+          >
+            <MessageCircle className="w-3.5 h-3.5 fill-current" />
+            <span>Chat</span>
+          </button>
+        </div>
+
         {/* User list */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-[160px]">
           {loading ? (
@@ -704,7 +736,12 @@ const FindPeopleModal: React.FC<{
               return (
                 <div key={u.uid} className="flex items-center justify-between p-2.5 rounded-xl bg-[#111b21] hover:bg-[#182229] border border-[#2e3b43] transition">
                   <div className="flex items-center gap-3 min-w-0">
-                    <img src={u.photoURL || getAvatarUrl(u.uid)} className="w-10 h-10 rounded-full object-cover shrink-0" alt="" />
+                    <img 
+                      src={getAvatarUrl(u.uid, u.photoURL)} 
+                      className="w-10 h-10 rounded-full object-cover shrink-0" 
+                      alt={u.displayName} 
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = getAvatarUrl(u.uid); }} 
+                    />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-[#e9edef] truncate">{u.displayName}</p>
                       <p className="text-[11px] text-[#8696a0] flex items-center gap-1.5">
@@ -776,6 +813,8 @@ const ChatItem: React.FC<{
   const isPending = chat.type === 'dm' && chat.requestStatus === 'pending';
   const isReceiver = isPending && chat.requestReceiverId === currentUserId;
   const isSender = isPending && chat.requestSenderId === currentUserId;
+  const otherId = chat.type === 'dm' ? chat.participants.find(p => p !== currentUserId) : undefined;
+  const isSelfChat = chat.type === 'dm' && (!otherId || (chat.participants.length === 1 && chat.participants[0] === currentUserId));
 
   return (
     <motion.div 
@@ -799,6 +838,14 @@ const ChatItem: React.FC<{
             isReceiver ? "ring-2 ring-emerald-500/60" : ""
           )} 
           alt={displayName}
+          onError={(e) => {
+            if (chat.type === 'group') {
+              (e.currentTarget as HTMLImageElement).src = createGroupSvgDataUri(chat.id, chat.name);
+            } else {
+              const oId = chat.participants.find(p => p !== currentUserId) || currentUserId;
+              (e.currentTarget as HTMLImageElement).src = getAvatarUrl(oId);
+            }
+          }}
         />
         {chat.type === 'dm' ? (
           isReceiver ? (
@@ -828,6 +875,11 @@ const ChatItem: React.FC<{
             {isSender && (
               <span className="px-1.5 py-0.2 text-[9px] font-semibold rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
                 Pending
+              </span>
+            )}
+            {isSelfChat && (
+              <span className="px-1.5 py-0.2 text-[9px] font-bold rounded bg-[#00a884]/20 text-[#00a884] border border-[#00a884]/30 uppercase tracking-wider shrink-0">
+                Notes
               </span>
             )}
           </div>
@@ -1991,6 +2043,7 @@ const ContactProfileModal: React.FC<{
               src={getAvatarUrl(target.uid, target.photoURL)} 
               className={cn("w-24 h-24 rounded-full object-cover shadow-lg border-2", isBlocked ? "border-red-500/80" : "border-[#00a884]")} 
               alt={target.displayName} 
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = getAvatarUrl(target.uid); }}
             />
             {isBlocked && (
               <span className="absolute bottom-0 right-0 p-1 bg-red-500 text-white rounded-full shadow">
@@ -2552,7 +2605,12 @@ const GroupInfoModal = ({
                       candidatesToAdd.map(cand => (
                         <div key={cand.uid} className="flex items-center justify-between p-1.5 rounded-lg bg-[#202c33] hover:bg-[#2a3942] text-xs">
                           <div className="flex items-center gap-2 min-w-0">
-                            <img src={cand.photoURL || getAvatarUrl(cand.uid)} className="w-5 h-5 rounded-full object-cover" alt="" />
+                            <img 
+                              src={getAvatarUrl(cand.uid, cand.photoURL)} 
+                              className="w-5 h-5 rounded-full object-cover" 
+                              alt={cand.displayName} 
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).src = getAvatarUrl(cand.uid); }} 
+                            />
                             <span className="text-[#e9edef] truncate font-medium">{cand.displayName}</span>
                           </div>
                           <button 
@@ -3163,10 +3221,78 @@ export default function App() {
     }
   };
 
+  const handleOpenSelfChat = async () => {
+    if (!user) return;
+    try {
+      // Check existing in-memory chats for self-chat
+      const existing = chats.find(c => c.type === 'dm' && c.participants.length === 1 && c.participants[0] === user.uid);
+      if (existing) {
+        setActiveChat(existing);
+        setSearchQuery('');
+        setShowFindPeopleModal(false);
+        return;
+      }
+
+      // Check Firestore
+      const q = query(
+        collection(db, 'chats'),
+        where('type', '==', 'dm'),
+        where('participants', 'array-contains', user.uid)
+      );
+      const snap = await getDocs(q);
+      const foundDoc = snap.docs.find(d => {
+        const c = d.data() as Chat;
+        return c.participants && c.participants.length === 1 && c.participants[0] === user.uid;
+      });
+
+      if (foundDoc) {
+        const chatData = { id: foundDoc.id, ...foundDoc.data() } as Chat;
+        setActiveChat(chatData);
+        setSearchQuery('');
+        setShowFindPeopleModal(false);
+        return;
+      }
+
+      // Create new self chat document
+      const participantsDetails = {
+        [user.uid]: { displayName: `${user.displayName} (Notes)`, photoURL: user.photoURL || '' }
+      };
+
+      const newChatRef = await addDoc(collection(db, 'chats'), {
+        type: 'dm',
+        name: `${user.displayName} (Notes)`,
+        participants: [user.uid],
+        participantsDetails,
+        requestStatus: 'accepted',
+        lastMessage: '📝 Notes to Self: Type any message, code, or file to test your chat box',
+        lastMessageAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      });
+
+      const newChatObj: Chat = {
+        id: newChatRef.id,
+        type: 'dm',
+        name: `${user.displayName} (Notes)`,
+        participants: [user.uid],
+        participantsDetails,
+        requestStatus: 'accepted',
+        lastMessage: '📝 Notes to Self: Type any message, code, or file to test your chat box'
+      };
+
+      setActiveChat(newChatObj);
+      setSearchQuery('');
+      setShowFindPeopleModal(false);
+      showNotification('Chat box opened! Send notes, test code & files.');
+    } catch (err) {
+      console.error('Failed to open self chat', err);
+      showNotification('Could not open Notes chat.');
+    }
+  };
+
   const handleStartDirectChat = async (targetUser: UserProfile) => {
     if (!user) return;
     if (targetUser.uid === user.uid) {
-      showNotification("You cannot chat with yourself!");
+      await handleOpenSelfChat();
       return;
     }
 
@@ -4605,6 +4731,16 @@ export default function App() {
         "w-full md:w-[400px] border-r border-[#3b4a54] flex flex-col transition-all h-full max-w-full",
         activeChat ? "hidden md:flex" : "flex"
       )}>
+        {/* Chat 120 Brand Header */}
+        <div className="bg-[#111b21] px-4 py-2.5 flex items-center border-b border-[#2e3b43]/40 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-[#00a884] via-[#05cd99] to-[#25d366] flex items-center justify-center text-white shadow-md shadow-[#00a884]/25 shrink-0">
+              <MessageCircle className="w-4 h-4 fill-current" />
+            </div>
+            <span className="text-white font-extrabold text-base tracking-tight select-none">Chat 120</span>
+          </div>
+        </div>
+
         {/* Header */}
         <div className="bg-[#202c33] px-4 py-3 flex justify-between items-center border-b border-[#2e3b43]/40">
           <motion.button 
@@ -4624,10 +4760,8 @@ export default function App() {
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[#e9edef] font-semibold text-sm truncate max-w-[170px] leading-tight group-hover:text-[#00a884] transition">{user.displayName}</span>
-              <span className="text-[11px] text-[#8696a0] group-hover:text-[#00a884] transition mt-0.5 flex items-center gap-1">
-                <span>Settings</span>
-                <span>•</span>
-                <span className="text-[#00a884] font-medium">Online</span>
+              <span className="text-[11px] text-[#00a884] font-medium mt-0.5 flex items-center gap-1">
+                <span>Online</span>
               </span>
             </div>
           </motion.button>
@@ -4744,6 +4878,25 @@ export default function App() {
                     <span className="text-[11px] font-semibold text-emerald-400 underline">View</span>
                   </div>
                 )}
+
+                {chats.length === 0 && !searchQuery && (
+                  <div 
+                    onClick={handleOpenSelfChat}
+                    className="mt-2 p-2.5 bg-gradient-to-r from-[#00a884]/20 via-[#05cd99]/15 to-[#202c33] hover:from-[#00a884]/25 border border-[#00a884]/40 rounded-xl flex items-center justify-between text-xs text-white cursor-pointer transition shadow-sm"
+                    title="Tap to open your personal chat box to test sending messages, code & voice notes"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-[#00a884] flex items-center justify-center text-white shrink-0 shadow-sm">
+                        <MessageCircle className="w-4 h-4 fill-current" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-white text-[12px] truncate">Open Chat Box & Notes</p>
+                        <p className="text-[10px] text-[#8696a0] truncate">Tap to test messages, code & media</p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-400 shrink-0 ml-2">Open →</span>
+                  </div>
+                )}
               </>
             );
           })()}
@@ -4776,7 +4929,12 @@ export default function App() {
                   return (
                     <div key={su.uid} className="flex items-center justify-between p-2 rounded-xl bg-[#202c33] hover:bg-[#2a3942] transition">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img src={su.photoURL || getAvatarUrl(su.uid)} className="w-8 h-8 rounded-full object-cover shrink-0" alt="" />
+                        <img 
+                          src={getAvatarUrl(su.uid, su.photoURL)} 
+                          className="w-8 h-8 rounded-full object-cover shrink-0" 
+                          alt={su.displayName} 
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = getAvatarUrl(su.uid); }} 
+                        />
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-[#e9edef] truncate">{su.displayName}</p>
                           <p className="text-[10px] text-emerald-400 flex items-center gap-1">
@@ -4880,15 +5038,25 @@ export default function App() {
                   </p>
                   <div className="flex flex-wrap justify-center gap-2">
                     <button
-                      onClick={() => { loadActiveUsers(); setShowFindPeopleModal(true); }}
-                      className="px-3.5 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-xl transition shadow flex items-center gap-1.5"
+                      type="button"
+                      onClick={handleOpenSelfChat}
+                      className="px-3.5 py-1.5 bg-[#00a884] hover:bg-[#008f6f] text-white text-xs font-semibold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
                     >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      <span>Find People by Name</span>
+                      <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                      <span>Open Chat Box</span>
                     </button>
                     <button
+                      type="button"
+                      onClick={() => { loadActiveUsers(); setShowFindPeopleModal(true); }}
+                      className="px-3.5 py-1.5 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] text-xs font-medium rounded-xl transition border border-[#3b4a54] flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <UserPlus className="w-3.5 h-3.5 text-[#00a884]" />
+                      <span>Find People</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => { loadActiveUsers(); setIsCreatingGroup(true); setShowGroupModal(true); }}
-                      className="px-3.5 py-1.5 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] text-xs font-medium rounded-xl transition border border-[#3b4a54] flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] text-xs font-medium rounded-xl transition border border-[#3b4a54] flex items-center gap-1.5 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>New Group</span>
@@ -4920,7 +5088,7 @@ export default function App() {
 
       {/* Main Chat Area */}
       <div className={cn(
-        "flex-1 w-full min-w-0 max-w-full flex flex-col bg-[#0b141a] relative overflow-x-hidden h-full",
+        "flex-1 w-full min-w-0 max-w-full flex flex-col bg-[#0b141a] relative overflow-hidden h-full",
         !activeChat ? "hidden md:flex items-center justify-center" : "flex"
       )}>
         {activeChat ? (
@@ -5018,6 +5186,13 @@ export default function App() {
                         src={headerAvatarUrl} 
                         className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover bg-[#3b4a54] border border-white/10 group-hover:ring-2 group-hover:ring-[#00a884] transition" 
                         alt={headerDisplayName}
+                        onError={(e) => {
+                          if (activeChat.type === 'group') {
+                            (e.currentTarget as HTMLImageElement).src = createGroupSvgDataUri(activeChat.id, activeChat.name);
+                          } else {
+                            (e.currentTarget as HTMLImageElement).src = getAvatarUrl(otherUid || user.uid);
+                          }
+                        }}
                       />
                       {isBlockedByMe && (
                         <div className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-0.5" title="You blocked this contact">
@@ -5165,7 +5340,7 @@ export default function App() {
             <div 
               ref={chatContainerRef}
               onScroll={handleChatScroll}
-              className="flex-1 w-full min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 chat-wallpaper custom-scrollbar relative"
+              className="flex-1 w-full min-w-0 min-h-0 max-w-full overflow-y-auto overflow-x-hidden p-2.5 sm:p-4 chat-wallpaper custom-scrollbar relative"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <div className="flex flex-col min-h-full w-full min-w-0 max-w-full justify-end">
@@ -5341,7 +5516,7 @@ export default function App() {
 
               if (isBlockedByMe && otherUid) {
                 return (
-                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-red-500/30 gap-2 shrink-0 w-full min-w-0">
+                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-red-500/30 gap-2 shrink-0 sticky bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))] w-full min-w-0">
                     <div className="flex items-center gap-2 text-red-400 text-xs sm:text-sm min-w-0">
                       <Ban className="w-5 h-5 shrink-0" />
                       <span className="truncate sm:whitespace-normal">You have blocked this contact. Unblock to send messages or make calls.</span>
@@ -5359,7 +5534,7 @@ export default function App() {
 
               if (isRequestReceiver && otherUid) {
                 return (
-                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-emerald-500/30 gap-3 shrink-0 w-full min-w-0">
+                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-emerald-500/30 gap-3 shrink-0 sticky bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))] w-full min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Sparkles className="w-5 h-5 text-emerald-400 shrink-0" />
                       <span className="text-xs sm:text-sm text-[#e9edef] truncate">
@@ -5389,7 +5564,7 @@ export default function App() {
 
               if (isRequestSender && otherUid) {
                 return (
-                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-amber-500/30 gap-3 shrink-0 w-full min-w-0">
+                  <div className="bg-[#202c33] p-3 sm:p-4 flex items-center justify-between border-t border-amber-500/30 gap-3 shrink-0 sticky bottom-0 z-30 pb-[max(0.75rem,env(safe-area-inset-bottom))] w-full min-w-0">
                     <div className="flex items-center gap-2 text-amber-300 text-xs sm:text-sm min-w-0">
                       <Clock className="w-5 h-5 text-amber-400 shrink-0 animate-pulse" />
                       <span className="truncate">Waiting for {headerDisplayName} to accept your request before messaging...</span>
@@ -5407,7 +5582,7 @@ export default function App() {
 
               if (isRecordingVoiceNote) {
                 return (
-                  <div className="bg-[#202c33] p-2.5 flex items-center border-t border-[#2e3b43]/50">
+                  <div className="bg-[#202c33] p-2.5 flex items-center border-t border-[#2e3b43]/50 shrink-0 sticky bottom-0 z-30 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
                     <VoiceNoteRecorder 
                       onSend={handleSendVoiceNote}
                       onCancel={() => setIsRecordingVoiceNote(false)}
@@ -5418,7 +5593,7 @@ export default function App() {
               }
 
               return (
-                <div className="bg-[#202c33] p-2.5 flex flex-col gap-2 relative border-t border-[#2e3b43]/50">
+                <div className="bg-[#202c33] p-2.5 sm:p-3 flex flex-col gap-2 relative border-t border-[#2e3b43]/50 shrink-0 sticky bottom-0 z-30 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
                   {/* Quick Emoji Tray */}
                   <AnimatePresence>
                     {showEmojiTray && (
@@ -5665,19 +5840,38 @@ export default function App() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setShowScanner(true)}
-                className="px-4 py-2 bg-[#00a884] hover:bg-[#008f6f] text-white font-semibold text-xs rounded-xl transition shadow-lg shadow-[#00a884]/20 flex items-center gap-2"
+                onClick={handleOpenSelfChat}
+                className="px-4 py-2.5 bg-[#00a884] hover:bg-[#008f6f] text-white font-bold text-xs sm:text-sm rounded-xl transition shadow-xl shadow-[#00a884]/30 flex items-center gap-2 cursor-pointer"
+                title="Open your personal chat box to test sending messages, code & audio"
               >
-                <Scan className="w-4 h-4" />
-                <span>Scan Friend's QR</span>
+                <MessageCircle className="w-4 h-4 fill-current" />
+                <span>Open Chat Box (Notes to Self & Testing)</span>
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setShowGroupModal(true)}
-                className="px-4 py-2 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] font-medium text-xs rounded-xl transition border border-[#3b4a54] flex items-center gap-2"
+                onClick={() => { loadActiveUsers(); setShowFindPeopleModal(true); }}
+                className="px-4 py-2.5 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] font-medium text-xs sm:text-sm rounded-xl transition border border-[#3b4a54] flex items-center gap-2 cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
+                <UserPlus className="w-4 h-4 text-[#00a884]" />
+                <span>Find People</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowScanner(true)}
+                className="px-4 py-2.5 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] font-medium text-xs sm:text-sm rounded-xl transition border border-[#3b4a54] flex items-center gap-2 cursor-pointer"
+              >
+                <Scan className="w-4 h-4 text-[#8696a0]" />
+                <span>Scan QR</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { loadActiveUsers(); setIsCreatingGroup(true); setShowGroupModal(true); }}
+                className="px-4 py-2.5 bg-[#202c33] hover:bg-[#2a3942] text-[#e9edef] font-medium text-xs sm:text-sm rounded-xl transition border border-[#3b4a54] flex items-center gap-2 cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#8696a0]" />
                 <span>Create Group</span>
               </motion.button>
             </div>
@@ -5859,7 +6053,12 @@ export default function App() {
                                 )}
                               >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <img src={cand.photoURL || getAvatarUrl(cand.uid)} className="w-7 h-7 rounded-full object-cover shrink-0" alt="" />
+                                  <img 
+                                    src={getAvatarUrl(cand.uid, cand.photoURL)} 
+                                    className="w-7 h-7 rounded-full object-cover shrink-0" 
+                                    alt={cand.displayName} 
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = getAvatarUrl(cand.uid); }} 
+                                  />
                                   <span className="text-[#e9edef] font-medium truncate">{cand.displayName}</span>
                                 </div>
                                 <div className={cn(
@@ -5972,8 +6171,9 @@ export default function App() {
               <div className="relative mb-6">
                 <div className="w-24 h-24 rounded-full bg-[#00a884]/20 animate-ping absolute inset-0"></div>
                 <img 
-                  src={incomingCall.callerPhoto || getAvatarUrl(incomingCall.callerId, null)} 
+                  src={getAvatarUrl(incomingCall.callerId, incomingCall.callerPhoto)} 
                   alt={incomingCall.callerName}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).src = getAvatarUrl(incomingCall.callerId); }}
                   className="w-24 h-24 rounded-full object-cover border-4 border-[#00a884] shadow-lg relative z-10"
                 />
               </div>

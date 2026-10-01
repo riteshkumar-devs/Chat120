@@ -491,3 +491,42 @@ export function generateShortUserId(): string {
   }
   return `CW-${code}`;
 }
+
+// Distinctive SVG Group Avatar for group chats
+export function createGroupSvgDataUri(seed: string, name?: string): string {
+  const gradients = [
+    ['#00a884', '#05cd99'],
+    ['#3b82f6', '#1d4ed8'],
+    ['#8b5cf6', '#6d28d9'],
+    ['#ec4899', '#be185d'],
+    ['#f59e0b', '#d97706'],
+    ['#10b981', '#047857'],
+    ['#06b6d4', '#0891b2']
+  ];
+  let hash = 0;
+  const safeSeed = seed || 'group';
+  for (let i = 0; i < safeSeed.length; i++) {
+    hash = safeSeed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const [c1, c2] = gradients[Math.abs(hash) % gradients.length];
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="grp_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${c1}"/>
+        <stop offset="100%" stop-color="${c2}"/>
+      </linearGradient>
+    </defs>
+    <circle cx="50" cy="50" r="50" fill="url(#grp_${Math.abs(hash)})"/>
+    <g fill="#ffffff" opacity="0.95">
+      <circle cx="50" cy="38" r="14"/>
+      <circle cx="28" cy="42" r="10" opacity="0.8"/>
+      <circle cx="72" cy="42" r="10" opacity="0.8"/>
+      <path d="M 22 78 C 22 66 34 60 50 60 C 66 60 78 66 78 78 Z"/>
+      <path d="M 10 82 C 10 72 20 68 32 68 C 30 72 30 77 31 82 Z" opacity="0.75"/>
+      <path d="M 90 82 C 90 72 80 68 68 68 C 70 72 70 77 69 82 Z" opacity="0.75"/>
+    </g>
+  </svg>`.replace(/\s+/g, ' ').trim();
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
